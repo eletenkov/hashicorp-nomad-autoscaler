@@ -162,7 +162,7 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 	/*
 		After 5 ms more (15 ms total):
 		* hac2 should have tried to acquire the lock still just once:
-				initialDelay(5) + waitTime(11) = 16.
+				initialDelay(6) + waitTime(11) = 18.
 		* hac1 should have renewed the lease 2 times and still hold the lock:
 				initialDelay(0) + renewals(2) * renewalPeriod(7) = 14.
 	*/
@@ -180,7 +180,7 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 	/*
 		After 15 ms more (30 ms total):
 		* hac2 should have tried to acquire the lock 2 times:
-				initialDelay(5) + calls(2)* waitTime(11) = 27.
+				initialDelay(6) + calls(2)* waitTime(11) = 28.
 		* hac1 should have renewed the lease 4 times and still hold the lock:
 				initialDelay(0) + renewals(4) * renewalPeriod(7) = 28.
 	*/
@@ -211,7 +211,7 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 		* hac3 should have tried to acquire the lock twice, once on start and
 			once after waitTime(11).
 		* hac2 should have tried to acquire the lock 3 times:
-				initialDelay(5) + calls(3) * waitTime(11) = 38.
+				initialDelay(6) + calls(3) * waitTime(11) = 39.
 		* hac1 should have renewed the lease 4 times and still hold the lock:
 				initialDelay(0) + renewals(6) * renewalPeriod(7) = 42.
 	*/
@@ -240,7 +240,6 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 		* hac3 should have tried to acquire the lock 3 times.
 		* hac2 should have tried to acquire the lock 5 times and succeeded on the
 		 the fifth, is currently holding the lock and Run the service.
-				initialDelay(5) + calls(5) * waitTime(11) = .
 		* hc1 is stopped.
 	*/
 	must.Eq(t, 1, l.acquiresCalls[hac1.ID])
@@ -258,6 +257,7 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 		After 5 ms more (60 ms total):
 		* hac3 should have tried to acquire the lock 3 times.
 		* hac2 should have renewed the lock once.
+		* hc1 is stopped.
 	*/
 	must.Eq(t, 1, l.acquiresCalls[hac1.ID])
 	must.Eq(t, 5, l.acquiresCalls[hac2.ID])
