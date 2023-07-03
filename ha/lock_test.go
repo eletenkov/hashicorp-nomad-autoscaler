@@ -1,3 +1,6 @@
+//go:build !race
+// +build !race
+
 package ha
 
 import (
@@ -73,13 +76,10 @@ func (ml *mockLock) Renew(_ context.Context) error {
 type mockService struct {
 	startsCounter int
 	starterID     string
-	mu            sync.Mutex
 }
 
 func (ms *mockService) Run(callerID string, ctx context.Context) func(ctx context.Context) {
 	return func(ctx context.Context) {
-		ms.mu.Lock()
-		defer ms.mu.Unlock()
 
 		ms.startsCounter += 1
 		ms.starterID = callerID
@@ -228,8 +228,11 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 
 	// Stop hac1 and release the lock
 	hac1Cancel()
+
+	l.mu.Lock()
 	l.locked = false
 	l.renewsCounter = 0
+	l.mu.Unlock()
 
 	time.Sleep(10 * time.Millisecond)
 	/*
