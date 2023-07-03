@@ -49,7 +49,7 @@ func (ml *mockLock) Renew(_ context.Context) error {
 		return errors.New("error")
 	}
 
-	if time.Now().Sub(ml.leaseStartTime) > lease {
+	if time.Since(ml.leaseStartTime) > lease {
 		ml.locked = false
 		return errors.New("lease lost")
 	}
