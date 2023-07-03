@@ -6,28 +6,49 @@ import (
 	"time"
 
 	log "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/nomad-autoscaler/sdk/helper/uuid"
+)
+
+const (
+	renewalFactor = 0.7
+	waitFactor    = 1.1
 )
 
 type lock interface {
-	Acquire(ctx context.Context) (bool, error)
+	Acquire(ctx context.Context, callerID string) (string, error)
 	Release(ctx context.Context) error
 	Renew(ctx context.Context) error
 }
 
 type HAController struct {
+	ID            string
 	renewalPeriod time.Duration
 	waitPeriod    time.Duration
+	randomDelay   time.Duration
 
-	logger       log.Logger
-	lock         lock
-	ranGenerator *rand.Rand
+	logger log.Logger
+	lock   lock
 }
 
-func NewHAController(l lock) {
+func NewHAController(l lock, logger log.Logger, lease time.Duration) *HAController {
+	logger = logger.Named("ha_mode")
 
+	rn := rand.New(rand.NewSource(time.Now().Unix())).Intn(100)
+	hac := HAController{
+		lock:          l,
+		logger:        logger,
+		renewalPeriod: time.Duration(float64(lease) * renewalFactor),
+		waitPeriod:    time.Duration(float64(lease) * waitFactor),
+		ID:            uuid.Generate(),
+		randomDelay:   time.Duration(rn) * time.Millisecond,
+	}
+
+	return &hac
 }
 
 func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx context.Context)) error {
+	hc.logger.Named(hc.ID)
+
 	// To avoid collisions if all the instances start at the same time, wait
 	// a random time before making the first call.
 	hc.wait(ctx)
@@ -36,13 +57,14 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 	defer waitTimer.Stop()
 
 	for {
-
-		acquired, err := hc.lock.Acquire(ctx)
+		lockID, err := hc.lock.Acquire(ctx, hc.ID)
 		if err != nil {
+			// TODO: What to do with fatal errors?
 			hc.logger.Error("unable to get lock", err)
 		}
 
-		if acquired {
+		if lockID != "" {
+			hc.logger.Debug("lock acquired, ID", lockID)
 			funcCtx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
@@ -50,7 +72,7 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 			go protectedFunc(funcCtx)
 
 			// Maintain lease is a blocking function, will only return in case
-			// the lock is lost.
+			// the lock is lost or the context is canceled.
 			err := hc.maintainLease(ctx)
 			if err != nil {
 				hc.logger.Debug("lease lost", err)
@@ -69,6 +91,7 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 
 		select {
 		case <-ctx.Done():
+			hc.logger.Debug("context canceled, returning")
 			return nil
 
 		case <-waitTimer.C:
@@ -84,6 +107,7 @@ func (hc *HAController) maintainLease(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			hc.logger.Debug("context canceled, returning")
 			return nil
 
 		case <-renewTimer.C:
@@ -98,7 +122,7 @@ func (hc *HAController) maintainLease(ctx context.Context) error {
 }
 
 func (hc *HAController) wait(ctx context.Context) {
-	t := time.NewTimer(time.Duration(hc.ranGenerator.Intn(100)) * time.Millisecond)
+	t := time.NewTimer(hc.randomDelay)
 	defer t.Stop()
 
 	select {
