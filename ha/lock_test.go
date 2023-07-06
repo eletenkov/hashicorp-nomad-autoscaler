@@ -124,7 +124,7 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 
 	must.False(t, l.locked)
 
-	go hac1.Start(hac1Ctx, s.Run(hac1.ID, testCtx))
+	go hac1.Start(hac1Ctx, s.Run(hac1.ID, hac1Ctx))
 	go hac2.Start(testCtx, s.Run(hac2.ID, testCtx))
 
 	time.Sleep(4 * time.Millisecond)
@@ -179,7 +179,7 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 	time.Sleep(15 * time.Millisecond)
 	/*
 		After 15 ms more (30 ms total):
-		* hac2 should have tried to acquire the lock 2 times:
+		* hac2 should have tried to acquire the lock 3 times:
 				initialDelay(6) + calls(2)* waitTime(11) = 28.
 		* hac1 should have renewed the lease 4 times and still hold the lock:
 				initialDelay(0) + renewals(4) * renewalPeriod(7) = 28.
@@ -210,7 +210,7 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 		After 15 ms more (45 ms total):
 		* hac3 should have tried to acquire the lock twice, once on start and
 			once after waitTime(11).
-		* hac2 should have tried to acquire the lock 3 times:
+		* hac2 should have tried to acquire the lock 4 times:
 				initialDelay(6) + calls(3) * waitTime(11) = 39.
 		* hac1 should have renewed the lease 4 times and still hold the lock:
 				initialDelay(0) + renewals(6) * renewalPeriod(7) = 42.
@@ -280,8 +280,7 @@ func TestFailedRenewal(t *testing.T) {
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
-	// Wait time on hac1 is 0, it should always get the lock. Set the renewal
-	// period to 1.5  * lease (15 ms) to force and error.
+	// Set the renewal period to 1.5  * lease (15 ms) to force and error.
 	hac := HAController{
 		ID:            "hac1",
 		lock:          &l,
@@ -297,8 +296,8 @@ func TestFailedRenewal(t *testing.T) {
 
 	time.Sleep(5 * time.Millisecond)
 	/*
-		After 5ms, the service should be running, no renewals needed or performed
-		yet.
+		After 5ms, the service should be running and the lock held,
+		no renewals needed or performed yet.
 	*/
 
 	must.Eq(t, 1, l.acquiresCalls[hac.ID])
@@ -326,12 +325,10 @@ func TestFailedRenewal(t *testing.T) {
 		After 10ms (30ms total) hac should have tried and succeeded at getting
 		the lock and the service should be running again.
 	*/
-
 	must.Eq(t, 2, l.acquiresCalls[hac.ID])
 	must.True(t, l.locked)
 
 	must.Eq(t, 0, l.renewsCounter)
 	must.Eq(t, 2, s.startsCounter)
 	must.StrContains(t, hac.ID, s.starterID)
-
 }

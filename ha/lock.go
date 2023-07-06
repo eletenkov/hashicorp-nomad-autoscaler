@@ -53,10 +53,11 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 	// a random time before making the first call.
 	hc.wait(ctx)
 
-	waitTimer := time.NewTimer(hc.waitPeriod)
-	defer waitTimer.Stop()
+	waitTicker := time.NewTicker(hc.waitPeriod)
+	defer waitTicker.Stop()
 
 	for {
+		hc.logger.Debug("attempting to acquire lock")
 		lockID, err := hc.lock.Acquire(ctx, hc.ID)
 		if err != nil {
 			// TODO: What to do with fatal errors?
@@ -77,25 +78,20 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 			if err != nil {
 				hc.logger.Debug("lease lost", err)
 				cancel()
-
 				// Give the protected function some time to return before potentially
 				// running it again.
 				hc.wait(ctx)
 			}
 		}
 
-		if !waitTimer.Stop() {
-			<-waitTimer.C
-		}
-		waitTimer.Reset(hc.waitPeriod)
+		waitTicker = time.NewTicker(hc.waitPeriod)
 
 		select {
 		case <-ctx.Done():
 			hc.logger.Debug("context canceled, returning")
 			return nil
 
-		case <-waitTimer.C:
-			waitTimer.Reset(hc.waitPeriod)
+		case <-waitTicker.C:
 		}
 	}
 }
@@ -103,7 +99,6 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 func (hc *HAController) maintainLease(ctx context.Context) error {
 	renewTicker := time.NewTicker(hc.renewalPeriod)
 	defer renewTicker.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -111,6 +106,7 @@ func (hc *HAController) maintainLease(ctx context.Context) error {
 			return nil
 
 		case <-renewTicker.C:
+			hc.logger.Debug("renewing lease")
 			err := hc.lock.Renew(ctx)
 			if err != nil {
 				return err
