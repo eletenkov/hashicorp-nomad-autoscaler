@@ -83,7 +83,8 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 				hc.wait(ctx)
 			}
 		}
-
+		
+		waitTicker.Stop()
 		waitTicker = time.NewTicker(hc.waitPeriod)
 
 		select {
