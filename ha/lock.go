@@ -101,8 +101,8 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 }
 
 func (hc *HAController) maintainLease(ctx context.Context) error {
-	renewTimer := time.NewTimer(hc.renewalPeriod)
-	defer renewTimer.Stop()
+	renewTicker := time.NewTicker(hc.renewalPeriod)
+	defer renewTicker.Stop()
 
 	for {
 		select {
@@ -110,12 +110,11 @@ func (hc *HAController) maintainLease(ctx context.Context) error {
 			hc.logger.Debug("context canceled, returning")
 			return nil
 
-		case <-renewTimer.C:
+		case <-renewTicker.C:
 			err := hc.lock.Renew(ctx)
 			if err != nil {
 				return err
 			}
-			renewTimer.Reset(hc.renewalPeriod)
 		}
 	}
 
