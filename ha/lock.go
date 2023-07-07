@@ -31,7 +31,7 @@ type LockController struct {
 }
 
 func NewHAController(l lock, logger log.Logger, lease time.Duration) *HAController {
-	logger = logger.Named("ha_mode")
+	logger = logger.Named("lock_controller")
 
 	rn := rand.New(rand.NewSource(time.Now().Unix())).Intn(100)
 	hac := HAController{
