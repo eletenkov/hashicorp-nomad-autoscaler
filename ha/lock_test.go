@@ -14,7 +14,7 @@ import (
 	"github.com/shoenig/test/must"
 )
 
-var lease = 10 * time.Millisecond
+var testLease = 10 * time.Millisecond
 
 type mockLock struct {
 	locked        bool
@@ -63,7 +63,7 @@ func (ml *mockLock) Renew(_ context.Context) error {
 		return errors.New("error")
 	}
 
-	if time.Since(ml.leaseStartTime) > lease {
+	if time.Since(ml.leaseStartTime) > testLease {
 		ml.locked = false
 		return errors.New("lease lost")
 	}
@@ -104,21 +104,21 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 	defer hac1Cancel()
 
 	// Wait time on hac1 is 0, it should always get the lock.
-	hac1 := HAController{
+	hac1 := HALockController{
 		ID:            "hac1",
 		lock:          &l,
 		logger:        testlog.HCLogger(t),
-		renewalPeriod: time.Duration(float64(lease) * renewalFactor),
-		waitPeriod:    time.Duration(float64(lease) * waitFactor),
+		renewalPeriod: time.Duration(float64(testLease) * renewalFactor),
+		waitPeriod:    time.Duration(float64(testLease) * waitFactor),
 		randomDelay:   0,
 	}
 
-	hac2 := HAController{
+	hac2 := HALockController{
 		ID:            "hac2",
 		lock:          &l,
 		logger:        testlog.HCLogger(t),
-		renewalPeriod: time.Duration(float64(lease) * renewalFactor),
-		waitPeriod:    time.Duration(float64(lease) * waitFactor),
+		renewalPeriod: time.Duration(float64(testLease) * renewalFactor),
+		waitPeriod:    time.Duration(float64(testLease) * waitFactor),
 		randomDelay:   6 * time.Millisecond,
 	}
 
@@ -195,12 +195,12 @@ func TestAcquireLock_MultipleInstances(t *testing.T) {
 	must.StrContains(t, hac1.ID, s.starterID)
 
 	// Start a new instance of the service with ha running, initial delay of 1ms
-	hac3 := HAController{
+	hac3 := HALockController{
 		ID:            "hac3",
 		lock:          &l,
 		logger:        testlog.HCLogger(t),
-		renewalPeriod: time.Duration(float64(lease) * renewalFactor),
-		waitPeriod:    time.Duration(float64(lease) * waitFactor),
+		renewalPeriod: time.Duration(float64(testLease) * renewalFactor),
+		waitPeriod:    time.Duration(float64(testLease) * waitFactor),
 		randomDelay:   1 * time.Millisecond,
 	}
 
@@ -280,13 +280,13 @@ func TestFailedRenewal(t *testing.T) {
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
-	// Set the renewal period to 1.5  * lease (15 ms) to force and error.
-	hac := HAController{
+	// Set the renewal period to 1.5  * testLease (15 ms) to force and error.
+	hac := HALockController{
 		ID:            "hac1",
 		lock:          &l,
 		logger:        testlog.HCLogger(t),
-		renewalPeriod: time.Duration(float64(lease) * 1.5),
-		waitPeriod:    time.Duration(float64(lease) * waitFactor),
+		renewalPeriod: time.Duration(float64(testLease) * 1.5),
+		waitPeriod:    time.Duration(float64(testLease) * waitFactor),
 		randomDelay:   0,
 	}
 

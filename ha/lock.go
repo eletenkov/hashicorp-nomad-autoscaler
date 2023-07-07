@@ -20,7 +20,7 @@ type lock interface {
 	Renew(ctx context.Context) error
 }
 
-type LockController struct {
+type HALockController struct {
 	ID            string
 	renewalPeriod time.Duration
 	waitPeriod    time.Duration
@@ -30,23 +30,24 @@ type LockController struct {
 	lock   lock
 }
 
-func NewHAController(l lock, logger log.Logger, lease time.Duration) *HAController {
-	logger = logger.Named("lock_controller")
+func NewHALockController(l lock, logger log.Logger, lease time.Duration) *HALockController {
+	ID := uuid.Generate()
+	logger = logger.Named("ha_mode").With("id", ID)
 
 	rn := rand.New(rand.NewSource(time.Now().Unix())).Intn(100)
-	hac := HAController{
+	hac := HALockController{
 		lock:          l,
 		logger:        logger,
 		renewalPeriod: time.Duration(float64(lease) * renewalFactor),
 		waitPeriod:    time.Duration(float64(lease) * waitFactor),
-		ID:            uuid.Generate(),
+		ID:            ID,
 		randomDelay:   time.Duration(rn) * time.Millisecond,
 	}
 
 	return &hac
 }
 
-func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx context.Context)) error {
+func (hc *HALockController) Start(ctx context.Context, protectedFunc func(ctx context.Context)) error {
 	hc.logger.Named(hc.ID)
 
 	// To avoid collisions if all the instances start at the same time, wait
@@ -97,7 +98,7 @@ func (hc *HAController) Start(ctx context.Context, protectedFunc func(ctx contex
 	}
 }
 
-func (hc *HAController) maintainLease(ctx context.Context) error {
+func (hc *HALockController) maintainLease(ctx context.Context) error {
 	renewTicker := time.NewTicker(hc.renewalPeriod)
 	defer renewTicker.Stop()
 	for {
@@ -116,7 +117,7 @@ func (hc *HAController) maintainLease(ctx context.Context) error {
 	}
 }
 
-func (hc *HAController) wait(ctx context.Context) {
+func (hc *HALockController) wait(ctx context.Context) {
 	t := time.NewTimer(hc.randomDelay)
 	defer t.Stop()
 
