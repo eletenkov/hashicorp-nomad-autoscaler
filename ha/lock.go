@@ -114,7 +114,6 @@ func (hc *HAController) maintainLease(ctx context.Context) error {
 			}
 		}
 	}
-
 }
 
 func (hc *HAController) wait(ctx context.Context) {
