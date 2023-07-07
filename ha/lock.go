@@ -20,7 +20,7 @@ type lock interface {
 	Renew(ctx context.Context) error
 }
 
-type HAController struct {
+type LockController struct {
 	ID            string
 	renewalPeriod time.Duration
 	waitPeriod    time.Duration
